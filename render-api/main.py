@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 import yt_dlp
+from yt_dlp.utils import DownloadError
 
 APP_HOST = os.getenv("PUBLIC_API_URL", "").rstrip("/")
 ORIGINS = [x.strip() for x in os.getenv("ALLOWED_ORIGINS", "http://localhost:8000").split(",") if x.strip()]
@@ -42,6 +43,27 @@ def allowed_url(raw):
         return True
     except (ValueError, socket.gaierror, OSError): return False
 
+def public_error(exc):
+    """Return safe diagnostic strings; never leak cookies, raw URLs or server details."""
+    msg = str(exc).lower()
+    if 'sign in to confirm' in msg or 'not a bot' in msg:
+        return 'YouTube側のBot検知により、Renderからの取得が拒否されました。APIの接続は正常です。yt-dlp更新でも解消しない場合があります。'
+    if 'private video' in msg or 'video is private' in msg:
+        return 'この動画は非公開です。'
+    if 'login required' in msg or 'sign in' in msg or 'login to' in msg:
+        return 'この動画にはログインが必要です。公開APIでは認証付き動画を取得できません。'
+    if 'unsupported url' in msg or 'no suitable extractor' in msg:
+        return 'この動画URLは現在サポートされていません。'
+    if 'drm' in msg:
+        return 'この動画はDRMで保護されているため取得できません。'
+    if 'requested format is not available' in msg:
+        return '指定した画質や形式は利用できません。別の画質をお試しください。'
+    if '429' in msg or 'too many requests' in msg:
+        return '配信元のアクセス回数制限に達しました。しばらくしてからお試しください。'
+    if '403' in msg or 'forbidden' in msg:
+        return '配信元からアクセスを拒否されました（403）。'
+    return '動画を取得できませんでした。配信元の制限、動画の公開状態、対応状況などを確認してください。'
+
 def clean():
     now=time.time()
     for token,job in list(JOBS.items()):
@@ -49,7 +71,7 @@ def clean():
             JOBS.pop(token,None)
 
 def inspect(url):
-    options={'quiet':True,'no_warnings':True,'skip_download':True,'noplaylist':True,'socket_timeout':15,'retries':1,'extractor_retries':1, 'ignoreconfig':True}
+    options={'quiet':True,'no_warnings':True,'skip_download':True,'noplaylist':True,'socket_timeout':15,'retries':1,'extractor_retries':1, 'ignoreconfig':True, 'js_runtimes':{'node':{}}}
     with yt_dlp.YoutubeDL(options) as ydl:
         info=ydl.extract_info(url,download=False)
         if info and info.get('_type')=='playlist':raise ValueError('プレイリストには対応していません')
@@ -57,7 +79,7 @@ def inspect(url):
 
 def save_video(url, mode, folder):
     out=str(folder/'%(title).90s-%(id)s.%(ext)s')
-    opts={'outtmpl':out,'quiet':True,'no_warnings':True,'noplaylist':True,'socket_timeout':20,'retries':2,'fragment_retries':2, 'ignoreconfig':True, 'restrictfilenames':True, 'overwrites':False}
+    opts={'outtmpl':out,'quiet':True,'no_warnings':True,'noplaylist':True,'socket_timeout':20,'retries':2,'fragment_retries':2, 'ignoreconfig':True, 'js_runtimes':{'node':{}}, 'restrictfilenames':True, 'overwrites':False}
     if mode=='mp3':
         opts.update(format='bestaudio/best',postprocessors=[{'key':'FFmpegExtractAudio','preferredcodec':'mp3','preferredquality':'192'}])
     else:
@@ -69,7 +91,7 @@ def save_video(url, mode, folder):
     return max(items,key=lambda x:x.stat().st_size)
 
 @app.get('/health')
-def health():return {'ok':True}
+def health():return {'ok':True,'yt_dlp_version':yt_dlp.version.__version__, 'ffmpeg':bool(shutil.which('ffmpeg')), 'ffprobe':bool(shutil.which('ffprobe')), 'runtime':bool(shutil.which('node')), 'studio_version':'2.0'}
 
 @app.post('/api/info')
 async def info(req: Input, request:Request):
@@ -77,7 +99,7 @@ async def info(req: Input, request:Request):
     if not allowed_url(req.url):raise HTTPException(400,'このURLは未対応、または安全に検証できませんでした')
     async with LOCK:
         try: data=await asyncio.wait_for(asyncio.to_thread(inspect,req.url),timeout=50)
-        except Exception as exc: raise HTTPException(422,'動画を解析できませんでした。非公開・DRM・ログイン必須・配信元の制限などが原因の可能性があります') from exc
+        except Exception as exc: raise HTTPException(422,public_error(exc)) from exc
     token=uuid.uuid4().hex
     JOBS[token]={'url':req.url,'created':time.time()}
     origin=APP_HOST or str(request.base_url).rstrip('/')
@@ -99,4 +121,9 @@ async def download(token:str,mode:str):
         return FileResponse(file,media_type='audio/mpeg' if mode=='mp3' else 'video/mp4',filename=filename,background=BackgroundTask(shutil.rmtree,folder,True))
     except Exception as exc:
         shutil.rmtree(folder,ignore_errors=True)
-        raise HTTPException(422,'動画取得に失敗しました。配信元の制限、空き容量、処理時間などを確認してください') from exc
+        raise HTTPException(422,public_error(exc)) from exc
+
+
+# Serve the complete studio alongside the existing API contract.
+from app import app as studio_app
+app.include_router(studio_app.router)
