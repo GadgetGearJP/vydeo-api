@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VYDEO — Video Downloader</title><meta name="theme-color" content="#080b17">
+<style>
+:root{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:#f3f6ff;background:#080b17;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse 60% 45% at 50% -15%,#334ab755,transparent),#080b17}
+header{max-width:1080px;margin:auto;padding:27px 25px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-weight:900;font-size:24px;letter-spacing:-1px}.logo span{color:#99afff}.pill{padding:8px 14px;border-radius:50px;border:1px solid #39425e;color:#a4b1d0;font-size:12px}
+main{max-width:900px;padding:40px 22px 100px;margin:auto}.hero{text-align:center;padding:55px 0 38px}.overline{color:#a5b5ff;font-size:13px;font-weight:750;letter-spacing:3px}
+h1{font-size:clamp(36px,6vw,66px);line-height:1.15;letter-spacing:-2.5px;margin:15px auto;max-width:760px}
+h1 em{font-style:normal;background:linear-gradient(95deg,#8ea8ff,#bd90f8);background-clip:text;-webkit-text-fill-color:transparent}
+.sub{color:#99a4bf;line-height:1.7;font-size:15px}.panel{border:1px solid #344060;border-radius:23px;padding:26px;background:#11182de9;box-shadow:0 25px 80px #0006}
+.label{font-size:13px;font-weight:750;color:#b7c5ec;margin:0 0 12px}
+.inputrow{display:flex;gap:10px}.inputrow input{flex:1;min-width:0;background:#090f21;border:1px solid #384768;color:white;padding:19px;border-radius:13px;font:inherit;outline:none}
+.inputrow input:focus{border-color:#96a9fc}button{cursor:pointer;border:0;border-radius:13px;font-weight:800;font:inherit}
+.primary{background:linear-gradient(120deg,#6487f4,#a275f0);color:white;padding:16px 26px;font-weight:800}
+.primary:hover{filter:brightness(1.12)}button:disabled{opacity:.55;cursor:wait}
+.hint{margin:14px 0 0;color:#8998ba;font-size:12px;line-height:1.6}
+.status{margin-top:18px;color:#a4b7ff;font-size:14px;white-space:pre-wrap}.error{color:#ff9eaf}
+.result{margin-top:25px;display:none;grid-template-columns:200px 1fr;gap:22px;align-items:start}
+.result.show{display:grid}.thumb{width:100%;aspect-ratio:16/10;object-fit:cover;background:#1b2542;border-radius:15px}.result h2{font-size:20px;line-height:1.4;margin:0 0 6px}.muted{color:#92a1bf;font-size:13px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}select{padding:13px;background:#0b1225;border:1px solid #3a4765;color:white;border-radius:11px;max-width:100%}
+.download{display:inline-block;text-decoration:none;text-align:center;margin-top:14px;padding:15px 22px;background:#597bef;color:white;border-radius:12px;font-weight:800}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:30px}.card{background:#11182d;border:1px solid #2d3852;border-radius:18px;padding:19px}.card strong{display:block;margin-bottom:10px}.card p{color:#9aa9c9;font-size:13px;line-height:1.6;margin:0}
+.sectiontitle{font-size:18px;margin:42px 0 15px}.settings{display:flex;gap:9px;flex-wrap:wrap}.settings input{flex:1;min-width:220px;padding:14px;background:#0c1427;color:#fff;border:1px solid #354361;border-radius:10px}
+.settings button{padding:13px 18px;color:#fff;background:#34466c}details{margin-top:30px;color:#a4b2d0;line-height:1.7;font-size:13px}summary{cursor:pointer;color:#e5edff}
+footer{text-align:center;color:#687895;font-size:12px;padding:30px}
+@media(max-width:620px){.hero{padding:26px 0}.inputrow{flex-direction:column}.result{grid-template-columns:1fr}.cards{grid-template-columns:1fr}.panel{padding:18px}h1{letter-spacing:-1px}}
+</style></head>
+<body><header><div class="logo">VY<span>DEO</span><span style="color:#fff">.</span></div><div class="pill">CLOUDFLARE EDITION</div></header>
+<main>
+<section class="hero"><div class="overline">VIDEO DOWNLOAD STUDIO</div><h1>お気に入りの動画を、<br><em>シンプルに保存。</em></h1><p class="sub">動画URLを入力して解析。直接配信ファイルはそのまま、<br>対応する動画サイトは接続したダウンロードAPIから取得します。</p></section>
+<div class="panel">
+<p class="label">動画のURL</p><form id="form" class="inputrow"><input id="url" type="url" placeholder="https://example.com/video..." required><button class="primary" id="go">動画を解析 →</button></form>
+<p class="hint">直接配信の MP4 / WebM / MP3 等に対応。YouTube・TikTok 等のページURLには yt-dlp 対応APIの接続が必要です。</p>
+<div id="status" class="status" role="status"></div>
+<div id="result" class="result"><img id="thumb" class="thumb" alt="動画サムネイル"><div><h2 id="title"></h2><div id="meta" class="muted"></div><div id="controls" class="controls"></div><a id="download" class="download" target="_blank" rel="noopener noreferrer">ダウンロード ↗</a><p class="hint" id="note"></p></div></div>
+</div>
+<div class="cards"><div class="card"><strong>⚡ シンプルな操作</strong><p>URLを貼って解析。利用可能な形式から選んで保存できます。</p></div><div class="card"><strong>🎞️ 画質と形式</strong><p>外部APIと接続すれば動画形式・解像度選択に対応します。</p></div><div class="card"><strong>🔒 無理な制限回避なし</strong><p>DRMや有料視聴制限を解除せず、取得可能な動画を扱います。</p></div></div>
+<h3 class="sectiontitle">外部ダウンロードAPIの設定（任意）</h3>
+<div class="settings"><input id="api" type="url" placeholder="https://your-api.example.com"><button id="save" type="button">保存</button></div>
+<p class="hint">APIが未設定の場合、通常の動画ページURLの解析はできません。サーバーはHTTPSとCORSに対応する必要があります。</p>
+<details><summary>API の仕様・注意事項を開く</summary>
+<p><code>POST /api/info</code> に <code>{"url":"..."}</code> を送信し、<code>{"title":"...","thumbnail":"...","formats":[{"label":"1080p MP4","url":"https://..."}]}</code> を返す構成です。<code>GET</code> で映像を配信するダウンロードURLが必要です。第三者による悪用を防ぐため、APIに認証・URL制限・レート制限を実装してください。</p>
+<p>ブラウザの仕様や配信元の制限により、ダウンロードリンクを押すと再生画面が開く場合があります。全サイトへの対応や最高画質の保証はありません。</p>
+</details>
+</main><footer>VYDEO STUDIO • Download content you have permission to save.</footer>
+<script>
+const el=id=>document.getElementById(id), status=el('status'), result=el('result');
+const direct=/\.(mp4|webm|mov|m4v|mp3|m4a|wav|ogg)(?:[?#]|$)/i;
+let formats=[];
+el('api').value=localStorage.getItem('vydeo_api')||'';
+el('save').onclick=()=>{let v=el('api').value.trim().replace(/\/+$/,'');if(v&&!/^https:\/\//i.test(v)){status.textContent='APIにはHTTPSのURLを指定してください。';status.className='status error';return}localStorage.setItem('vydeo_api',v);status.textContent='API設定を保存しました。';status.className='status'};
+function safeURL(v){try{let u=new URL(v);if(!['https:','http:'].includes(u.protocol))return '';return u.href}catch{return ''}}
+function show(info){formats=(info.formats||[]).filter(f=>safeURL(f.url));el('title').textContent=info.title||'動画ファイル';el('meta').textContent=info.duration?'再生時間: '+info.duration:'';const src=safeURL(info.thumbnail||'');el('thumb').style.display=src?'block':'none';if(src)el('thumb').src=src;el('controls').replaceChildren();if(formats.length){let sel=document.createElement('select');for(let [i,f] of formats.entries()){let o=document.createElement('option');o.value=i;o.textContent=f.label||('形式 '+(i+1));sel.append(o)}sel.onchange=()=>setFormat(+sel.value);el('controls').append(sel);setFormat(0)}else{el('download').style.display='none';el('note').textContent='ダウンロード形式を取得できませんでした。'}result.classList.add('show')}
+function setFormat(i){let f=formats[i];el('download').href=f.url;el('download').style.display='inline-block';el('note').textContent='配信元がブラウザ保存に非対応の場合、動画が新規タブで開きます。'}
+el('form').onsubmit=async e=>{e.preventDefault();result.classList.remove('show');status.className='status';let url=safeURL(el('url').value.trim());if(!url){status.textContent='有効なURLを入力してください。';return}el('go').disabled=true;status.textContent='URLを確認しています…';
+try{if(direct.test(url)){show({title:decodeURIComponent(new URL(url).pathname.split('/').pop()||'動画ファイル'),formats:[{label:'元のファイル',url}]});status.textContent='ファイルへの直接リンクを確認しました（アクセス可能かは配信元によります）。'}
+else{let api=el('api').value.trim().replace(/\/+$/,'');if(!api){throw Error('動画ページURLの解析には外部APIが必要です。下の設定にAPIのURLを入力してください。')}
+status.textContent='外部APIで解析しています…';let ctrl=new AbortController(),t=setTimeout(()=>ctrl.abort(),90000);let r;try{r=await fetch(api+'/api/info',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url}),signal:ctrl.signal})}finally{clearTimeout(t)}let data=await r.json();if(!r.ok)throw Error((typeof data.detail==='string' && data.detail) || data.error || 'APIエラー '+r.status);if(!Array.isArray(data.formats)||!data.formats.length)throw Error('ダウンロード可能な形式がありません。');show(data);status.textContent='解析が完了しました。'}}
+catch(err){status.className='status error';status.textContent=err.name==='AbortError'?'APIの応答がタイムアウトしました。':String(err.message||err)}finally{el('go').disabled=false}};
+</script></body></html>

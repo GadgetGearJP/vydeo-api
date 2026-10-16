@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: vydeo-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: ALLOWED_ORIGINS
+        value: "https://YOUR-PROJECT.pages.dev"
